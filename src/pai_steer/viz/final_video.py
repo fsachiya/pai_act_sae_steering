@@ -15,7 +15,7 @@ from pai_steer.viz.render import StateRenderer, font, put_text
 
 W, H = 1280, 720
 BG = (22, 26, 34)
-PAUSE = 4.0  # 動作の動画の終了後に止める秒数
+PAUSE = 3.0  # 動作の動画の終了後に止める秒数
 
 
 def card(lines, sub=None):
@@ -53,7 +53,7 @@ def figure(path, caption, note=None, split=False):
     return np.array(c)
 
 
-def clip(R, rec, color, label, speed, cam="agentview", hold=15):
+def clip(R, rec, color, label, speed, cam="agentview", hold=1):
     n_steps = len(rec["states"])
     states = list(rec["states"]) + [rec["final_state"]] * hold
     on_all = np.asarray(rec["steer_on"], bool)
@@ -112,13 +112,13 @@ def main():
                   ("LLM では SAE / DiffMean による steering が提案されているが,", .5),
                   ("特徴を見つけられても (probing) 狙いどおり動かせるとは限らない (steering)", .5),
                   ("→ パラメータの少ない ACT で, probing と steering のギャップを検証する", .52),
-                  ("想定: 生産ラインで, パーツ A を B の箱へ, B を A の箱へ運ぶように変更する", .45)])] * sec(10)
+                  ("想定: 生産ラインで, パーツ A を B の箱へ, B を A の箱へ運ぶように変更する", .45)])] * sec(8)
     out += [card([("タスク", .9), ("Panda がキューブ (4色のうち1色) を掴み, 同じ色の箱へ入れる", .55),
                   ("robosuite 上の自作環境 / スクリプト方策のデモ 400 本で ACT を模倣学習", .5),
                   ("観測: 手先・キューブの位置姿勢 + キューブの色 (one-hot)", .5),
-                  ("x = 前後 (+x 奥), y = 左右 (+y 左) / ベースライン成功率: 4色とも 100%", .5)])] * sec(7)
+                  ("x = 前後 (+x 奥), y = 左右 (+y 左) / ベースライン成功率: 4色とも 100%", .5)])] * sec(6)
     # ベースライン 4色 (2x2)
-    S = 2.0
+    S = 1.0
     tiles = [clip(R, g0[("base", c, c)], c, f"{COLOR_JP[c]}キューブ → {COLOR_JP[c]}の箱", S) for c in COLORS]
     n = max(len(t) for t in tiles)
     tiles = [t + [t[-1]] * (n - len(t)) for t in tiles]
@@ -129,15 +129,15 @@ def main():
                   ("① 色 (知覚レベル): encoder の color トークンの色の特徴を差し替え", .5),
                   ("② x/y 移動 (運動レベル): decoder 出力の移動方向の特徴を刺激", .5),
                   ("③ 軌道 (運動レベル): decoder 出力の行き先ごとの軌道の特徴を差し替え", .5),
-                  ("介入は把持後だけ / 誤差を保存した介入 h' = h + W_dec (f' − f)", .45)])] * sec(9)
+                  ("介入は把持後だけ / 誤差を保存した介入 h' = h + W_dec (f' − f)", .45)])] * sec(8)
     # 色の介入
-    S = 1.5
+    S = 1.0
     t = [clip(R, g0[("base", "red", "red")], "red", "介入なし\n赤キューブ", S),
          clip(R, g0[("color_sae", "red", "blue")], "red", "色の介入 (SAE)\n赤 → 青の箱", S),
          clip(R, g0[("color_dm", "red", "yellow")], "red", "色の介入 (DiffMean)\n赤 → 黄の箱", S)]
     out += fit(row(t), "① 色の介入: 行き先の箱だけが切り替わる (把持は崩れない)", S)
     # x/y 移動・軌道の介入 (網羅探索で選んだ設定). 行き先へ届く例と, 元の箱へ戻る・別の箱や箱外へ外れる例
-    S = 2.0
+    S = 1.0
     t = [clip(R, g0[("xy_sae", "red", "blue")], "red", "x/y 移動 (SAE)\n赤 → 青の箱 (+y)", S),
          clip(R, g0[("xy_sae", "red", "green")], "red", "x/y 移動 (SAE)\n赤 → 緑の箱 (−x)", S),
          clip(R, g0[("xy_dm", "red", "green")], "red", "x/y 移動 (DiffMean)\n赤 → 緑の箱 (−x)", S)]
@@ -151,33 +151,33 @@ def main():
                   ("① 色:  SAE 95%  /  DiffMean 100%", .62),
                   ("② x/y 移動:  SAE 18%  /  DiffMean 17%", .62),
                   ("③ 軌道:  SAE 22%  /  DiffMean 35%", .62), ("", .2),
-                  ("位置・強度・特徴数をどう選んでも, 運動レベルの介入は効かない", .48)])] * sec(9)
+                  ("位置・強度・特徴数をどう選んでも, 運動レベルの介入は効かない", .48)])] * sec(8)
     out += [card([("考察: 運動レベルの介入が効かない4つの要因", .75),
                   ("1. 色 (目的) の表現が元の箱へ引き戻す (平均 14% が元の箱へ戻る)", .47),
                   ("2. デモの動きの偏り: 運搬中 80% の時刻が +y (左), −y (右) は 3%", .47),
                   ("3. x/y の特徴が軸に沿っていない (例: +x の特徴が左へも動かす)", .47),
                   ("4. 「4 パターンの軌道」の特徴はなく, x と y の成分 × 状態依存で表現", .47), ("", .2),
                   ("改善案B: 特徴の組み合わせで軸からのずれを補正 (要因3)", .5),
-                  ("改善案A: 色の特徴を抑えて引き戻しをなくす (要因1)", .5)])] * sec(13)
+                  ("改善案A: 色の特徴を抑えて引き戻しをなくす (要因1)", .5)])] * sec(12)
     out += [figure(FIGS / "direction_study.png", "要因2: 方向ごとの到達率",
                    "デモに多い +y (左) は届きやすく, デモにほぼない −y (右) はどの設定でも届きにくい")] * sec(7)
     # x/y: 従来 vs 補正版
-    S = 2.0
+    S = 1.0
     t = [clip(R, g1[("xy_sae_old", "green", "red")], "green", "従来 (上位3特徴)\n緑 → 赤の箱 (+x)", S),
          clip(R, g1[("xy_corrected", "green", "red")], "green", "改善案B\n緑 → 赤の箱 (+x)", S),
          clip(R, g1[("xy_corrected", "blue", "red")], "blue", "改善案B\n青 → 赤の箱 (−y)", S)]
     out += fit(row(t), "改善案B の x/y 移動の介入: 補正で1軸の移動は届く / −y (右) は届かない", S)
     out += [figure(FIGS / "xy_corrected.png", "改善案B: 特徴の組み合わせ + 軸ごとの較正",
-                   "到達率 16% → 58% (DiffMean 18%)。1軸は 98〜100%, −y を含む方向は 0%", split=True)] * sec(9)
+                   "到達率 16% → 58% (DiffMean 18%)。1軸は 98〜100%, −y を含む方向は 0%", split=True)] * sec(8)
     out += [figure(FIGS / "xy_corrected_suppress.png", "改善案A: 色の特徴の抑制を追加",
-                   "+y を含む対角は 100% に上がるが, 1軸は大きく下がり全体は 46〜48% に低下", split=True)] * sec(9)
+                   "+y を含む対角は 100% に上がるが, 1軸は大きく下がり全体は 46〜48% に低下", split=True)] * sec(8)
     out += [card([("まとめ", .9),
                   ("行き先を自在に変えられたのは, 目的 (色) の表現を差し替える介入だけ", .52),
                   ("運動 (x/y) の介入は, 目的が決める止まる位置をずらす形でしか働かない", .5),
                   ("→ 補正すれば 1 軸の移動は 98〜100% 届くが, −y (右) には置けない", .5),
                   ("SAE は特徴を組み合わせて DiffMean を上回れる (x/y: 58% vs 18%)", .5),
                   ("小さな動作生成モデルでも probing と steering のギャップがはっきり現れた", .5),
-                  ("限界: 色と行き先が常に 1 対 1 / 介入のタイミングにシミュレータの真の状態を使用", .4)])] * sec(13)
+                  ("限界: 色と行き先が常に 1 対 1 / 介入のタイミングにシミュレータの真の状態を使用", .4)])] * sec(12)
     path = VIDEOS / "pai_final.mp4"
     imageio.mimwrite(path, out, fps=FPS, codec="libx264", quality=7, pixelformat="yuv420p", macro_block_size=16)
     print("saved", path, f"{len(out) / FPS:.1f} 秒")
