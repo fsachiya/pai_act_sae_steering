@@ -4,14 +4,65 @@ Physical AI 応用編1 最終課題　説明資料
 
 ## 1. 概要と目的
 
-ロボットの模倣学習方策の内部表現に介入して、方策の行動を後から変えられるかを調べた。
+### 1.1 背景: 学習済みの動作生成モデルの推論動作を調整したい
 
+ロボットの動作生成では、学習済みモデルの推論動作を少しだけ調整したい場面がある。pick and place であれば、物体を置く位置を学習データより前後左右にずらす、運搬中の軌道を高く／低くする、といった調整である。
+
+動作と言語を一緒に学習した基盤モデル（VLA など）であれば、言語指示で対応できることもある。しかし、直したい動作の概念を基盤モデルが学習できていない場合や、言語でラベル付けされていない動作（動作データだけで学習した特化モデルなど）では、条件を少し変えるだけでも、その条件でデータを取り直して追加学習（fine-tuning など）するのが一般的である。
+
+そこで、モデルを再学習せず、**重みは固定したまま推論時に内部の活性へ介入して動作を変える**（activation steering）という方法が考えられる。この種の手法は LLM の分野で多く提案されており、代表例が Sparse Autoencoder（SAE）と DiffMean である。
+
+### 1.2 SAE と DiffMean
+
+**SAE（Sparse Autoencoder）**
+- モデルの中間層の活性ベクトルを、それより次元の大きい「特徴」の空間に写し、少数の特徴だけが働く（疎な）表現に分解する補助モデル。元のモデルとは別に、元のモデルの活性を再構成するように学習する。
+- 個々の特徴は「赤色」「右へ動く」のように人が解釈できる概念に対応することが多い。ある出力に対応する特徴を見つけ（probing）、その活性を推論中に強めたり弱めたりして元のモデルに戻すと、出力を変えられる（steering）。
+- 介入するのは活性で、元のモデルの重みは変えない。
+- LLM では、Anthropic の研究で Claude の中間層から「ゴールデンゲートブリッジ」に対応する特徴が見つかった。この特徴を強めると、何を聞いてもゴールデンゲートブリッジの話をするようになった [Templeton et al., 2024]。
+- 本課題では TopK SAE [Gao et al., 2024] を使った。これは、入力ごとに活性の大きい上位 k 個の特徴だけを残して疎さを直接決める SAE である。
+
+**DiffMean（平均差ベクトル）**
+- ある概念が「ある」入力と「ない」入力（例: 赤いキューブのときと青いキューブのとき）で、中間層の活性の平均を取り、その差のベクトルを推論中の活性に足す方法 [Marks & Tegmark, 2023]。
+- 学習が不要で、2群のデータだけで作れる。
+- LLM の steering のベンチマーク AxBench では、DiffMean が SAE より高い steering 性能を示した [Wu et al., 2025]。そのため本課題では、SAE と比べるベースラインとして使った。
+
+### 1.3 probing と steering のギャップ
+
+ある出力に関わる特徴を見つけられても（probing できても）、その特徴を強めたときに狙った要素だけが変わるとは限らない。
+- 疎な特徴の空間に分解しても、1つの概念の情報が複数の特徴に少しずつ分散したり、他の概念と同じ特徴に混ざったりする。
+- そのため、1つの特徴を動かすと狙った方向からずれた変化（副作用）が出る。
+
+このずれを減らす改良として、次のような SAE が提案されている。
+- TopK SAE: 疎さを直接制御し、再構成と疎さのバランスを改善する [Gao et al., 2024]
+- Matryoshka SAE: 小さい辞書（粗い特徴）から大きい辞書（細かい特徴）までを入れ子にして同時に学習し、概念の分離を改善する [Bussmann et al., 2025]
+
+それでも、probing と steering の間にはギャップが残ると報告されている [Wu et al., 2025]。
+
+動作生成モデルでも、内部表現へ介入して動作を変える研究が報告されている。
+- π0 と OpenVLA の FFN の活性から意味のある方向を取り出し、動作の速さや方向を変えた研究 [Häon et al., 2025]
+- VLA に SAE を適用し、動作プリミティブに対応する特徴を強めて動作を変えた研究 [Swann et al., 2026]
+
+一方で、VLA の中には、汎用的な動作プリミティブに対応する特徴と、特定のエピソードを丸暗記した特徴の両方があることも指摘されている [Swann et al., 2026]。また、LLM 向けの解釈手法はそのまま VLA には移らず、SAE は疎ではあるが不完全な介入の基底だとも指摘されている [Jin et al., 2026]。
+
+パラメータの少ない特化モデルは、汎用的な動作の要素よりも、デモの動作そのものを丸暗記するように学習しやすいと考えられる。その場合、steering はさらに難しくなると予想した。
+
+### 1.4 想定する場面とタスク
+
+生産ラインで複数種類のパーツを仕分ける作業を想定する。パーツ A は A の箱へ、パーツ B は B の箱へ運ぶデモで学習したあとに、「やはりパーツ A は B の箱の位置へ、パーツ B は A の箱の位置へ運びたい」という変更が必要になる場面である。
+
+本課題では、パーツを4色（赤・緑・青・黄）のキューブに見立てた。
 - **タスク**: 机の上に色の違う4つの箱（赤・緑・青・黄）が固定位置にあり、4色のうち1色のキューブが1つ置かれている。Panda アームがキューブを掴み、キューブと同じ色の箱に入れる。
-- **方策**: ACT（Action Chunking with Transformers）を、スクリプト方策で生成したデモから模倣学習した。
-- **目的**: 学習済みの重みは固定したまま、推論時に内部表現へ介入するだけで、「赤いキューブを緑・青・黄の箱に入れる」ことができるかを調べる。
-- **主な問い**: 「意図レベル」（どの箱へ運ぶか）と「運動レベル」（手先をどちらへ動かすか）の介入で、到達できる範囲と副作用はどう違うか。
+- **方策**: ACT（Action Chunking with Transformers）を、スクリプト方策で生成したデモから模倣学習した。パラメータ数の少ない、動作データだけで学習した特化モデルにあたる。
+- **介入**: 学習済みの重みは固定したまま、推論時に SAE または DiffMean で内部の活性へ介入し、「赤いキューブを緑・青・黄の箱に入れる」ことができるかを調べる。
 
-介入の方法は、疎な特徴に分解する TopK SAE（Sparse Autoencoder）と、平均活性の差ベクトルを足す DiffMean の2つを比較した。
+### 1.5 目的
+
+パラメータの少ない動作生成モデル（ACT）に SAE を適用する再現実験を行い、probing と steering のギャップがどの程度現れるかを検証する。介入は次の3種類で、それぞれ SAE と DiffMean で比較する。
+- **色**（意図レベル）: キューブの色の表現を別の色に置き換え、運び先の箱を変える
+- **x/y 移動**（運動レベル）: 手先を x/y 方向へずらす特徴を強める
+- **軌道**（運動レベル）: 4つの箱それぞれへ向かう軌道に対応する特徴を強める
+
+主な問いは、「意図レベル」（どの箱へ運ぶか）と「運動レベル」（手先をどちらへ動かすか）の介入で、到達できる範囲と副作用がどう違うかである。
 
 ## 2. 環境とデータ
 
@@ -173,3 +224,10 @@ robosuite 1.5.1（MuJoCo 3.3）上に、`ManipulationEnv` を継承した自作�
 - T. Z. Zhao, V. Kumar, S. Levine, C. Finn, "Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware," RSS 2023.
 - E. Todorov, T. Erez, Y. Tassa, "MuJoCo: A physics engine for model-based control," IROS 2012.
 - L. Gao et al., "Scaling and evaluating sparse autoencoders," arXiv:2406.04093.
+- A. Templeton et al., "Scaling Monosemanticity: Extracting Interpretable Features from Claude 3 Sonnet," Transformer Circuits Thread, 2024.
+- S. Marks, M. Tegmark, "The Geometry of Truth: Emergent Linear Structure in Large Language Model Representations of True/False Datasets," arXiv:2310.06824.
+- Z. Wu et al., "AxBench: Steering LLMs? Even Simple Baselines Outperform Sparse Autoencoders," arXiv:2501.17148.
+- B. Bussmann et al., "Learning Multi-Level Features with Matryoshka Sparse Autoencoders," arXiv:2503.17547.
+- B. Häon et al., "Mechanistic interpretability for steering vision-language-action models," CoRL 2025, arXiv:2509.00328.
+- A. Swann et al., "Sparse Autoencoders Reveal Interpretable and Steerable Features in VLA Models," arXiv:2603.19183.
+- X. Jin et al., "Event-Grounded Sparse Autoencoders for Vision-Language-Action Policies," arXiv:2605.17204.

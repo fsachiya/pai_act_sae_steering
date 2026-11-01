@@ -10,6 +10,7 @@ import re
 
 md = (ROOT / "docs/report.md").read_text()
 md = re.sub(r"(?m)^(  )+(?=[-*] |\d+\. )", lambda m: "    " * (len(m.group(0)) // 2), md)   # 入れ子の箇条書きを4文字字下げに
+md = re.sub(r"(?m)^(?![ \t]*(?:[-*] |\d+\. ))(.+)\n(?=[-*] |\d+\. )", r"\1\n\n", md)   # 段落直後の箇条書きの前に空行を入れる
 body = markdown.markdown(md, extensions=["tables"])
 html = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>説明資料</title><style>
 @page {{ size: A4; margin: 16mm 14mm; }}
