@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+artifacts/
+*.hdf5
+*.pt
+external/
+.claude/
+.DS_Store
+legacy_mimicgen/
+docs/report.html

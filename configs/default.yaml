@@ -1,0 +1,95 @@
+seed: 0
+
+env:
+  table_size: [0.8, 0.8, 0.05]
+  table_offset: [0.0, 0.0, 0.8]
+  control_freq: 20
+  horizon: 400
+  box_inner: 0.10          # 箱の内寸 [m]
+  box_wall_height: 0.05
+  box_wall_thickness: 0.005
+  boxes:                   # 箱の中心 (x, y)。x はロボットから遠ざかる向き, y は左向き
+    # ユーザー指示 (10/31) で「キューブを右側で掴み左側の箱へ置く」配置に変更。箱は左側 (+y) に 2x2
+    red: [0.14, 0.10]
+    green: [0.00, 0.10]    # 赤→緑: x のみのずれ (隣)
+    blue: [0.14, 0.24]     # 赤→青: y のみのずれ (隣)
+    yellow: [0.00, 0.24]   # 赤→黄: 対角
+  cube_size: 0.04
+  cube_friction: 1.5
+  cube_xy: [0.07, -0.15]   # 右側 (-y). x は箱の奥の列(0.14)と手前の列(0.00)の中間 (ユーザー指示)
+  noise:                   # 初期状態のノイズ (§3.4)
+    cube_xy: 0.01
+    cube_yaw_deg: 10.0
+    robot_qpos: 0.02
+  camera_size: 128
+
+expert:
+  kp: 10.0                 # a_pos = clip(kp * (p_wp - p_eef), -1, 1)
+  kp_rot: 1.0
+  wp_tol: 0.01
+  approach_height: 0.10    # キューブ真上 +
+  grasp_z_offset: 0.0      # 指先をキューブ中心の高さへ (eef site 基準のオフセット)
+  grasp_wait: 15
+  lift_height: 0.15        # 机から +
+  transport_height: 0.15   # 箱中心の真上 (机から +)
+  lower_above_wall: 0.03   # 箱の壁の上端 +
+  release_wait: 10
+  retreat_height: 0.10
+  max_steps: 400
+  # デモの多様性 (§4.2)
+  wp_xy_noise: 0.01
+  kp_scale: [0.8, 1.2]
+  action_noise: 0.05
+
+generate:
+  per_color: 100
+
+labels:
+  lift_threshold: 0.02     # 机から浮いている判定 [m]
+
+act:
+  chunk: 20
+  exec_steps: 5
+  d_model: 256
+  heads: 8
+  ffn: 1024
+  enc_layers: 4
+  dec_layers: 4
+  latent: 32
+  kl_weight: 10.0
+  dropout: 0.1
+  lr: 1.0e-4
+  wd: 1.0e-4
+  batch: 64
+  steps: 30000
+  quick_steps: 100
+
+eval:
+  n_episodes: 50
+  action_noise: 0.0        # E1/E2 は seed ごとに初期状態ノイズが変わるので行動ノイズは不要
+
+sae:
+  dict_mult: 8
+  k_decoder: 32
+  k_encoder: 16
+  lr: 1.0e-3
+  batch: 4096
+  epochs: 20
+  ortho_gamma: 0.0
+  stride_dec: 2
+  stride_enc: 1
+  aux_coef: 0.03
+  dead_steps: 500
+
+steer:
+  n_select_xy: 3
+  n_select_goal: 5
+  strengths:                # E2 の強度 (P1: α, P2: β, DiffMean: α)
+    p1: [0, 0.25, 0.5, 1, 2, 4]     # 層比較で α=4 は行き過ぎ (約30cm ずれる) だったので下げた
+    p2: [0, 0.25, 0.5, 1, 2, 3]
+    p1_dm: [0, 0.25, 0.5, 1, 2, 4]
+    p2_dm: [0, 0.25, 0.5, 1, 1.5, 2]
+    p3: [0, 1, 2, 4, 8]              # decoder 側は平均活性が小さいので大きめまで
+    p3_dm: [0, 0.5, 1, 2, 4]
+  n_episodes: 20           # E1 の各セル (seed 0..19 共通)
+  n_sweep: 10              # E2 の各点
