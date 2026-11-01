@@ -53,10 +53,14 @@ def figure(path, caption, note=None, split=False):
     return np.array(c)
 
 
-def clip(R, rec, color, label, speed, cam="agentview", hold=1):
-    n_steps = len(rec["states"])
-    states = list(rec["states"]) + [rec["final_state"]] * hold
+def clip(R, rec, color, label, speed, cam="agentview", hold=1, max_steps=None):
+    states = list(rec["states"])
     on_all = np.asarray(rec["steer_on"], bool)
+    cut = max_steps is not None and len(states) > max_steps  # 止まったまま長く続くエピソードは途中で打ち切る
+    if cut:
+        states, on_all = states[:max_steps], on_all[:max_steps]
+    n_steps = len(states)
+    states = states + [states[-1] if cut else rec["final_state"]] * hold
     on = list(on_all) + [False] * hold
     n = int(len(states) / SIM_HZ / speed * FPS)
     out = []
@@ -67,6 +71,8 @@ def clip(R, rec, color, label, speed, cam="agentview", hold=1):
         if t >= n_steps:
             pb = rec["placed_box"]
             txt += f"\n結果: {COLOR_JP[pb] + 'の箱' if isinstance(pb, str) and pb in COLOR_JP else '箱外'}"
+            if cut:
+                txt += f"\n(全 {len(rec["states"])} ステップのうち {max_steps} ステップ以降は省略)"
         fr = put_text(fr, txt, "tl", sz=17)
         if on[t]:
             fr = put_text(fr, "● 介入中", "bl", sz=17, color=(230, 40, 40))
@@ -165,7 +171,7 @@ def main():
     S = 1.0
     t = [clip(R, g1[("xy_sae_old", "green", "red")], "green", "従来 (上位3特徴)\n緑 → 赤の箱 (+x)", S),
          clip(R, g1[("xy_corrected", "green", "red")], "green", "改善案B\n緑 → 赤の箱 (+x)", S),
-         clip(R, g1[("xy_corrected", "blue", "red")], "blue", "改善案B\n青 → 赤の箱 (−y)", S)]
+         clip(R, g1[("xy_corrected", "blue", "red")], "blue", "改善案B\n青 → 赤の箱 (−y)", S, max_steps=200)]
     out += fit(row(t), "改善案B の x/y 移動の介入: 補正で1軸の移動は届く / −y (右) は届かない", S)
     out += [figure(FIGS / "xy_corrected.png", "改善案B: 特徴の組み合わせ + 軸ごとの較正",
                    "到達率 16% → 58% (DiffMean 18%)。1軸は 98〜100%, −y を含む方向は 0%", split=True)] * sec(8)
