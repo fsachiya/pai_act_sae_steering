@@ -1,6 +1,6 @@
 """提出用の動画 (§10, 2分30秒以内, H.264 30fps, 1280x720). 保存済みのロールアウトの states を再描画する.
 
-構成: タイトル → 背景と目的 → タスクとベースライン (4色) → 手法 → 色の介入 (介入なし / SAE / DiffMean)
+構成: タイトル → 背景と目的 → タスクとベースライン (4色) → 手法 → 色・x/y 移動・軌道の介入
       → 網羅探索の結果 → 4つの要因と改善案 → 方向別 → x/y 移動の介入 (従来 / 改善案B) → 改善案B・A の効果 → まとめ
 入力 artifacts/rollouts/grid_rollouts_seed0.npy (pattern_videos --grid), xy_corrected_rollouts_seed100.npy (xy_corrected_video)
 出力 artifacts/videos/pai_final.mp4
@@ -15,7 +15,7 @@ from pai_steer.viz.render import StateRenderer, font, put_text
 
 W, H = 1280, 720
 BG = (22, 26, 34)
-PAUSE = 2.0  # 動作の動画の終了後に止める秒数
+PAUSE = 4.0  # 動作の動画の終了後に止める秒数
 
 
 def card(lines, sub=None):
@@ -136,6 +136,16 @@ def main():
          clip(R, g0[("color_sae", "red", "blue")], "red", "色の介入 (SAE)\n赤 → 青の箱", S),
          clip(R, g0[("color_dm", "red", "yellow")], "red", "色の介入 (DiffMean)\n赤 → 黄の箱", S)]
     out += fit(row(t), "① 色の介入: 行き先の箱だけが切り替わる (把持は崩れない)", S)
+    # x/y 移動・軌道の介入 (網羅探索で選んだ設定). 行き先へ届く例と, 元の箱へ戻る・別の箱や箱外へ外れる例
+    S = 2.0
+    t = [clip(R, g0[("xy_sae", "red", "blue")], "red", "x/y 移動 (SAE)\n赤 → 青の箱 (+y)", S),
+         clip(R, g0[("xy_sae", "red", "green")], "red", "x/y 移動 (SAE)\n赤 → 緑の箱 (−x)", S),
+         clip(R, g0[("xy_dm", "red", "green")], "red", "x/y 移動 (DiffMean)\n赤 → 緑の箱 (−x)", S)]
+    out += fit(row(t), "② x/y 移動の介入: 届く方向もあるが, 別の箱や元の箱へ外れやすい", S)
+    t = [clip(R, g0[("traj_dm", "red", "green")], "red", "軌道 (DiffMean)\n赤 → 緑の箱", S),
+         clip(R, g0[("traj_sae", "red", "green")], "red", "軌道 (SAE)\n赤 → 緑の箱", S),
+         clip(R, g0[("traj_dm", "red", "blue")], "red", "軌道 (DiffMean)\n赤 → 青の箱", S)]
+    out += fit(row(t), "③ 軌道の介入: 切り替わる場合もあるが, 箱外や元の箱へ戻りやすい", S)
     out += [card([("網羅探索の結果 (166 条件, 9960 エピソード)", .8),
                   ("行き先の箱への最高到達率", .5), ("", .2),
                   ("① 色:  SAE 95%  /  DiffMean 100%", .62),
@@ -156,7 +166,7 @@ def main():
     t = [clip(R, g1[("xy_sae_old", "green", "red")], "green", "従来 (上位3特徴)\n緑 → 赤の箱 (+x)", S),
          clip(R, g1[("xy_corrected", "green", "red")], "green", "改善案B\n緑 → 赤の箱 (+x)", S),
          clip(R, g1[("xy_corrected", "blue", "red")], "blue", "改善案B\n青 → 赤の箱 (−y)", S)]
-    out += fit(row(t), "② x/y 移動の介入: 補正で1軸の移動は届く / −y (右) は届かない", S)
+    out += fit(row(t), "改善案B の x/y 移動の介入: 補正で1軸の移動は届く / −y (右) は届かない", S)
     out += [figure(FIGS / "xy_corrected.png", "改善案B: 特徴の組み合わせ + 軸ごとの較正",
                    "到達率 16% → 58% (DiffMean 18%)。1軸は 98〜100%, −y を含む方向は 0%", split=True)] * sec(9)
     out += [figure(FIGS / "xy_corrected_suppress.png", "改善案A: 色の特徴の抑制を追加",
