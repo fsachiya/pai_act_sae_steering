@@ -34,17 +34,17 @@ def strip(ax, rows, title, labels=True, note=None):
             ax.add_patch(Rectangle((f - BAR_W / 2, y + 0.15), BAR_W, 0.7, fc=col, alpha=0.25 + 0.75 * a,
                                    ec="black" if shared else "none", lw=0.9))
             if labels:
-                ax.text(f, y + 0.9, str(f), ha="center", va="bottom", fontsize=6, rotation=90)
+                ax.text(f, y + 0.9, str(f), ha="center", va="bottom", fontsize=7.5, rotation=90)
     ax.set_yticks([(len(rows) - 1 - r) * pitch + 0.5 for r in range(len(rows))])
-    ax.set_yticklabels([n for n, _, _ in rows], fontsize=9)
+    ax.set_yticklabels([n for n, _, _ in rows], fontsize=11)
     ax.set_xlim(-20, D + 20); ax.set_ylim(0, (len(rows) - 1) * pitch + (1.7 if labels else 1.0))
     ax.set_xticks(range(0, D + 1, 256)); ax.tick_params(axis="x", labelsize=8)
     for s in ["top", "right", "left"]:
         ax.spines[s].set_visible(False)
-    ax.set_title(title, fontsize=10, loc="left")
+    ax.set_title(title, fontsize=12, loc="left")
     if note:
-        ax.annotate(note, xy=(1.0, 0), xycoords="axes fraction", xytext=(0, -30), textcoords="offset points",
-                    ha="right", va="top", fontsize=7.5, color="#444")
+        ax.annotate(note, xy=(1.0, 0), xycoords="axes fraction", xytext=(0, -42), textcoords="offset points",
+                    ha="right", va="top", fontsize=9.5, color="#444")
 
 
 def main():
@@ -55,11 +55,12 @@ def main():
     traj = json.load(open(FEATURES / "traj_features_decoder_out.json"))
     K = len(traj["per_k"])
 
-    fig, axs = plt.subplots(3, 1, figsize=(13, 12), gridspec_kw=dict(hspace=0.6, height_ratios=[1.35, 1.35, 1]))
+    fig, axs = plt.subplots(3, 1, figsize=(13, 12), gridspec_kw=dict(hspace=0.7, height_ratios=[1.35, 1.35, 1]))
     strip(axs[0], [(COLOR_JP[c], RGB[c], {f: 1.0 for f in color[c]}) for c in COLORS],
           "① 色の介入（色の SAE, encoder 層0 の color トークン, 色ごとに 5 特徴）　到達率 95%",
           note="swap: 元の色の行の特徴を 0 にし, 行き先の色の行の特徴を「その色での平均活性 × β」にする")
-    strip(axs[1], [(d, DIR_C[d], {r["feat"]: 1.0 for r in xy[d][:5]}) for d in ["+x", "-x", "+y", "-y"]],
+    DIR_JP = {"+x": "+x（奥）", "-x": "−x（手前）", "+y": "+y（左）", "-y": "−y（右）"}
+    strip(axs[1], [(DIR_JP[d], DIR_C[d], {r["feat"]: 1.0 for r in xy[d][:5]}) for d in ["+x", "-x", "+y", "-y"]],
           "② x/y 移動の介入（decoder 出力の SAE, 方向ごとに上位 5 特徴）　到達率 18%",
           note="add: 行き先の方向の行の特徴に α × 典型活性を足す（対角はx と y の両方の行）。黒枠 = 複数の方向で選ばれた特徴")
     rows = []
@@ -70,8 +71,8 @@ def main():
           labels=False,
           note="swap（位置 k ごと）。濃さ = その特徴を使う位置 k の数（濃いほど多くの位置で使う）。4 色の間で共通する特徴はない")
     for a in axs:
-        a.set_xlabel("SAE の特徴の番号（辞書 2048 個）", fontsize=8)
-    fig.suptitle("SAE の介入で刺激した特徴（各パターンの網羅探索で最も到達率が高かった設定）", fontsize=12, y=0.93)
+        a.set_xlabel("SAE の特徴の番号（辞書 2048 個）", fontsize=10)
+    fig.suptitle("SAE の介入で刺激した特徴（各パターンの網羅探索で最も到達率が高かった設定）", fontsize=14, y=0.93)
     plt.savefig(FIGS / "sae_feature_map.png", dpi=150, bbox_inches="tight"); plt.close()
     print("saved", FIGS / "sae_feature_map.png")
 

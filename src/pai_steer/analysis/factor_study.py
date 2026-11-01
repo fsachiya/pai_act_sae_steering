@@ -47,7 +47,12 @@ def main():
     p = base_parser(__doc__)
     p.add_argument("--ckpt", default=str(CKPT / "act.pt"))
     p.add_argument("--n", type=int, default=5)
+    p.add_argument("--plot-only", action="store_true", help="既存の factor_study_summary.csv から図だけ描く")
     args = p.parse_args()
+    if args.plot_only:
+        ensure(FIGS)
+        plot(pd.read_csv(RESULTS / "factor_study_summary.csv"))
+        return
     cfg = load_config(args.config)
     ensure(RESULTS, FIGS)
     L = Layout(cfg["env"])
@@ -94,8 +99,12 @@ def main():
     pd.set_option("display.width", 250)
     print(sm.round(2).to_string())
 
+    plot(sm)
+
+
+def plot(sm):
     conds = list(dict.fromkeys(sm.条件))
-    fig, axs = plt.subplots(3, 2, figsize=(20, 13))
+    fig, axs = plt.subplots(3, 2, figsize=(15, 14), sharex=True)
     x = np.arange(len(conds)); w = 0.2
     cols = {None: "0.5", "sae_src": "C0", "sae_all": "C2", "dm_mean": "C1"}
     for gi, gate in enumerate(["lift", "transport"]):
@@ -105,11 +114,12 @@ def main():
                 axs[ri, gi].bar(x - 0.3 + w * j, sub[col], w, color=cols[sp], label=SUP_JP[sp])
         for ri, t in enumerate(["行き先の箱への到達率", "どの箱にも入らない率", "元の色の箱に戻った率"]):
             a = axs[ri, gi]
-            a.set_xticks(x); a.set_xticklabels(conds, rotation=25, ha="right", fontsize=8); a.set_ylim(0, 1.05)
-            a.set_title(f"{t} (介入: {GATE_JP[gate]})", fontsize=10); a.legend(fontsize=7)
-    fig.suptitle("x/y 移動・軌道の介入 + 色の特徴の抑制 (各棒 60 エピソード = 4色 × 他の3色 × seed 5)", fontsize=12)
-    plt.tight_layout(); plt.savefig(FIGS / "factor_study.png", dpi=120); plt.close()
-
+            a.set_xticks(x); a.set_xticklabels(conds, rotation=30, ha="right"); a.set_ylim(0, 1.05)
+            a.set_title(f"{t}（介入: {GATE_JP[gate]}）")
+    h, lab = axs[0, 0].get_legend_handles_labels()
+    fig.legend(h, lab, loc="lower center", ncol=4, bbox_to_anchor=(0.5, 0.0))
+    fig.suptitle("x/y 移動・軌道の介入 + 色の特徴の抑制（各棒 60 エピソード = 4色 × 他の3色 × seed 5）")
+    plt.tight_layout(rect=(0, 0.04, 1, 1)); plt.savefig(FIGS / "factor_study.png", dpi=120); plt.close()
 
 if __name__ == "__main__":
     main()

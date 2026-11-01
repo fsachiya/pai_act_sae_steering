@@ -130,12 +130,12 @@ def plot(agg, n_seed):
                 ax.imshow(M, vmin=0, vmax=1, cmap="viridis", aspect="auto")
                 for i in range(len(sites)):
                     for j in range(len(sts)):
-                        ax.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=10,
+                        ax.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=12,
                                 color="w" if M[i, j] < .6 else "k")
-                ax.set_xticks(range(len(sts))); ax.set_xticklabels([f"{x:g}" for x in sts], fontsize=9)
-                ax.set_xlabel("強度", fontsize=9)
-                ax.set_yticks(range(len(sites))); ax.set_yticklabels(sites, fontsize=9)
-                ax.set_title(f"{pt} / {m}", fontsize=11)
+                ax.set_xticks(range(len(sts))); ax.set_xticklabels([f"{x:g}" for x in sts], fontsize=11)
+                ax.set_xlabel("強度", fontsize=11)
+                ax.set_yticks(range(len(sites))); ax.set_yticklabels(sites, fontsize=11)
+                ax.set_title(f"{pt} / {m}", fontsize=12.5)
             else:
                 _, pt, m, site, sts = panels[c]
                 b = agg[(agg.study == "n_feat") & (agg.pattern == pt) & (agg.method == m)]
@@ -143,10 +143,10 @@ def plot(agg, n_seed):
                     bb = b[b.strength == st].sort_values("n_feat")
                     ax.plot(bb.n_feat, bb.reached, marker="o", label=f"強度 {st:g}")
                 ax.set_xscale("log"); ax.set_xticks(N_FEATS); ax.set_xticklabels(N_FEATS); ax.set_ylim(-0.03, 1.03)
-                ax.set_xlabel("使う特徴の数 n", fontsize=9); ax.set_ylabel("到達率", fontsize=9); ax.legend(fontsize=9)
-                ax.set_title(f"特徴数の探索: {pt} / {m}\n({site})", fontsize=10.5)
+                ax.set_xlabel("使う特徴の数 n", fontsize=11); ax.set_ylabel("到達率", fontsize=11); ax.legend(fontsize=11)
+                ax.set_title(f"特徴数の探索: {pt} / {m}\n({site})", fontsize=12)
     fig.suptitle(f"介入探索のグリッド (到達率, 各マス 60 エピソード = 4色 × 他の3色 × seed {n_seed}, 介入は把持後)",
-                 fontsize=13)
+                 fontsize=14)
     plt.tight_layout(); plt.savefig(FIGS / "search_grid.png", dpi=130); plt.close()
 
 if __name__ == "__main__":

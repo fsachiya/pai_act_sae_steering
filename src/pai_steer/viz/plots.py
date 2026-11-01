@@ -34,7 +34,7 @@ def pattern_of(stem):
 def plot_e0():
     for f in sorted(RESULTS.glob("e0*.csv")):
         df = pd.read_csv(f)
-        fig, ax = plt.subplots(figsize=(6, 3.5))
+        fig, ax = plt.subplots(figsize=(6.5, 3.8))
         xs = np.arange(4)
         for j, (col, lab) in enumerate([("success", "成功率"), ("grasped", "把持成功率")]):
             v = [wilson(df[df.color == c][col].sum(), (df.color == c).sum()) for c in COLORS]
@@ -43,8 +43,8 @@ def plot_e0():
                    capsize=3, label=lab, color=[RGB[c] for c in COLORS] if j == 0 else "0.6", alpha=1 if j == 0 else .7)
         ax.set_xticks(xs); ax.set_xticklabels([COLOR_JP[c] for c in COLORS]); ax.set_ylim(0, 1.05)
         ax.axhline(0.9, ls="--", c="gray", lw=.8)
-        ax.set_title(f"E0 ({f.stem}, 各色 {len(df) // 4} エピソード, 95% Wilson CI)", fontsize=10)
-        ax.legend(fontsize=8, loc="lower right")
+        ax.set_title(f"介入なしの成功率（各色 {len(df) // 4} エピソード, 95% Wilson CI）")
+        ax.legend(loc="lower right")
         plt.tight_layout(); plt.savefig(FIGS / f"{f.stem}.png", dpi=130); plt.close()
 
 

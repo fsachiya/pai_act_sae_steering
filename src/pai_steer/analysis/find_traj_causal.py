@@ -56,7 +56,12 @@ def main():
     p.add_argument("--sites", default=",".join(DEC_SITES))
     p.add_argument("--n-fit", type=int, default=192)
     p.add_argument("--n-eval", type=int, default=128)
+    p.add_argument("--plot-only", action="store_true", help="既存の traj_causal_patch.csv から図だけ描く")
     args = p.parse_args()
+    if args.plot_only:
+        ensure(FIGS)
+        plot(pd.read_csv(RESULTS / "traj_causal_patch.csv"))
+        return
     cfg = load_config(args.config)
     ensure(FEATURES, FIGS, RESULTS)
     model, mcfg, stats = load_policy(args.ckpt)
@@ -123,18 +128,21 @@ def main():
     piv = df.groupby(["site", "kind", "n"]).gap_reduction.mean().unstack("n").round(3)
     pd.set_option("display.width", 200)
     print(piv.to_string())
-    fig, axs = plt.subplots(1, 2, figsize=(12, 4.2), sharey=True)
-    for ax, kind, t in [(axs[0], "exact", "上位 n 特徴をサンプルごとの反実仮想の値に差し替え"),
-                        (axs[1], "mean_k", "上位 n 特徴を行き先の色での平均値 (位置 k ごと) に固定")]:
+    plot(df)
+
+
+def plot(df):
+    fig, axs = plt.subplots(1, 2, figsize=(13, 5.6), sharey=True)
+    for ax, kind, t in [(axs[0], "exact", "上位 n 特徴をサンプルごとの\n反実仮想の値に差し替え"),
+                        (axs[1], "mean_k", "上位 n 特徴を行き先の色での平均値\n（位置 k ごと）に固定")]:
         for site in df.site.unique():
             g = df[(df.site == site) & (df.kind == kind)].groupby("n").gap_reduction.mean()
             ax.plot(g.index, g.values, marker="o", label=site)
         ax.set_xscale("log"); ax.set_xticks(NS); ax.set_xticklabels(NS); ax.axhline(0, c="k", lw=.5)
-        ax.set_xlabel("差し替える特徴の数 n (寄与の大きい順)"); ax.set_title(t, fontsize=10); ax.legend(fontsize=8)
-    axs[0].set_ylabel("参照チャンク (行き先の箱へ向かう) への近づき")
-    fig.suptitle("decoder 側の軌道特徴の因果的な特定 (評価用サンプル, 全色 × 他の3色の平均)", fontsize=11)
+        ax.set_xlabel("差し替える特徴の数 n（寄与の大きい順）"); ax.set_title(t); ax.legend()
+    axs[0].set_ylabel("参照チャンク（行き先の箱へ向かう）\nへの近づき")
+    fig.suptitle("decoder 側の軌道特徴の因果的な特定（評価用サンプル, 全色 × 他の3色の平均）")
     plt.tight_layout(); plt.savefig(FIGS / "traj_causal.png", dpi=130); plt.close()
-
 
 if __name__ == "__main__":
     main()

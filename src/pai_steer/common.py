@@ -87,3 +87,6 @@ def setup_mpl():
             matplotlib.rcParams["font.family"] = font_manager.FontProperties(fname=p).get_name()
             break
     matplotlib.rcParams["axes.unicode_minus"] = False
+    # レポートに幅いっぱいで載せても読める文字の大きさ
+    matplotlib.rcParams.update({"font.size": 12, "axes.titlesize": 12.5, "axes.labelsize": 12, "xtick.labelsize": 11,
+                                "ytick.labelsize": 11, "legend.fontsize": 10.5, "figure.titlesize": 14})

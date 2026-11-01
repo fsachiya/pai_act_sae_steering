@@ -105,7 +105,7 @@ def plot(sm):
     axs[0].axhline(0.9, ls="--", c="gray", lw=.8)
     axs[1].bar(x, sm.goal_rel_sel, color="C4")
     for i, t in enumerate(sm.goal_token):
-        axs[1].text(i, sm.goal_rel_sel[i] + .02, t, ha="center", fontsize=8)
+        axs[1].text(i, sm.goal_rel_sel[i] + .02, t, ha="center", fontsize=10)
     for a, prefix, title in [(axs[2], "p2", "色の介入 (P2): 行き先の箱への到達率"),
                              (axs[3], "p1", "x/y 移動の介入 (P1): 行き先の箱への到達率")]:
         cols = [c for c in sm.columns if c.startswith(prefix) and c.endswith("_reached")]
@@ -114,13 +114,13 @@ def plot(sm):
             method, st = c.replace("_reached", "").split("_", 1)[1].split("@")
             sym = "β" if (prefix, method) == ("p2", "sae") else "α"
             a.bar(x - .4 + w * (j + .5), sm[c].fillna(0), w, label=f"{'SAE' if method == 'sae' else 'DiffMean'} {sym}={st}")
-        a.set_title(title); a.set_ylim(0, 1.05); a.legend(fontsize=8)
-    axs[0].set_title("SAE の品質"); axs[0].legend(fontsize=8, loc="upper center", ncol=2); axs[0].set_ylim(0, 1.2)
+        a.set_title(title); a.set_ylim(0, 1.05); a.legend(fontsize=10)
+    axs[0].set_title("SAE の品質"); axs[0].legend(fontsize=10, loc="upper center", ncol=2); axs[0].set_ylim(0, 1.2)
     axs[0].set_yticks(np.arange(0, 1.01, 0.2))   # 上限は 1.0. 1.2 までの余白は凡例用
     axs[1].set_title("目標特徴の相対選択性 (最良トークン)"); axs[1].set_ylim(0, 1.1)
     for a in axs:
-        a.set_xticks(x); a.set_xticklabels(sites, rotation=30, ha="right", fontsize=9)
-    plt.suptitle("SAE を適用する位置の比較 (介入は把持後, 全色 × 他の3色の箱)", fontsize=12)
+        a.set_xticks(x); a.set_xticklabels(sites, rotation=30, ha="right", fontsize=11)
+    plt.suptitle("SAE を適用する位置の比較 (介入は把持後, 全色 × 他の3色の箱)", fontsize=14)
     plt.tight_layout(); plt.savefig(FIGS / "layer_study.png", dpi=130); plt.close()
 
 

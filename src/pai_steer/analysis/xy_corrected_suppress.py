@@ -34,7 +34,12 @@ DIRS = ["+x", "-x", "+y", "-y", "+x&+y", "-x&+y", "+x&-y", "-x&-y"]
 def main():
     p = base_parser(__doc__)
     p.add_argument("--ckpt", default=str(CKPT / "act.pt"))
+    p.add_argument("--plot-only", action="store_true", help="既存の xy_corrected_suppress_summary.csv から図だけ描く")
     args = p.parse_args()
+    if args.plot_only:
+        ensure(FIGS)
+        plot(pd.read_csv(RESULTS / "xy_corrected_suppress_summary.csv"))
+        return
     cfg = load_config(args.config)
     ensure(RESULTS, FIGS)
     L = Layout(cfg["env"])
@@ -77,25 +82,37 @@ def main():
     print(neg.groupby("var", sort=False).agg(到達=("reached", "mean"), 元の箱=("stayed", "mean"),
                                             箱外=("placed_box", lambda x: x.isna().mean()), 長さ=("length", "mean")).round(2).to_string())
 
-    fig, axs = plt.subplots(1, 2, figsize=(19, 5), gridspec_kw=dict(width_ratios=[1, 1.6]))
+    plot(sm)
+
+
+LABEL = {"V2 軸ごとに較正": "軸ごとに較正", "V4 (色の抑制なし)": "補正した x/y（色の抑制なし）",
+         "V4 + SAE: 元の色の特徴を0 (−y は下ろし始めで停止)": "+ SAE: 元の色の特徴を 0\n（−y は下ろし始めで停止）",
+         "V4 + SAE: 元の色の特徴を0 (−y も最後まで介入)": "+ SAE: 元の色の特徴を 0\n（−y も最後まで介入）",
+         "V4 + DiffMean: 色を中立化 (−y は下ろし始めで停止)": "+ DiffMean: 色を中立化\n（−y は下ろし始めで停止）",
+         "V4 + DiffMean: 色を中立化 (−y も最後まで介入)": "+ DiffMean: 色を中立化\n（−y も最後まで介入）"}
+
+
+def plot(sm):
+    labels = [LABEL.get(v, v) for v in sm.条件]
+    fig, axs = plt.subplots(2, 1, figsize=(12, 11.5))
     a = axs[0]
     y = np.arange(len(sm))
     a.barh(y, sm.到達率, xerr=[sm.到達率 - sm.ci_lo, sm.ci_hi - sm.到達率], capsize=3)
     for i, r in sm.iterrows():
         a.text(r.ci_hi + 0.02, i, f"{r.到達率:.0%}", va="center")
-    a.set_yticks(y); a.set_yticklabels(sm.条件, fontsize=8); a.invert_yaxis(); a.set_xlim(0, 1.1)
-    a.set_xlabel("行き先の箱への到達率 (12 対 × 20, 95% Wilson CI)")
-    a.set_title("補正版 x/y 介入 + 色の抑制 (評価 seed 100-119)", fontsize=10)
+    a.set_yticks(y); a.set_yticklabels(labels); a.invert_yaxis(); a.set_xlim(0, 1.1)
+    a.set_xlabel("行き先の箱への到達率（12 対 × 20, 95% Wilson CI）")
+    a.set_title("補正した x/y 移動の介入 + 色の抑制（評価 seed 100〜119）")
     a = axs[1]
     M = sm.set_index("条件").reindex(columns=DIRS).values
     im = a.imshow(M, vmin=0, vmax=1, cmap="viridis", aspect="auto")
     for i in range(M.shape[0]):
         for j in range(M.shape[1]):
-            a.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=9, color="w" if M[i, j] < .6 else "k")
-    a.set_xticks(range(len(DIRS))); a.set_xticklabels(DIRS); a.set_yticks(range(len(sm))); a.set_yticklabels(sm.条件, fontsize=8)
-    a.set_title("方向ごとの到達率", fontsize=10); plt.colorbar(im, ax=a)
+            a.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=11, color="w" if M[i, j] < .6 else "k")
+    a.set_xticks(range(len(DIRS))); a.set_xticklabels(DIRS); a.set_yticks(range(len(sm))); a.set_yticklabels(labels)
+    a.set_xlabel("元の箱 → 行き先の箱のずれの方向（x: 前後, y: 左右）")
+    a.set_title("方向ごとの到達率"); plt.colorbar(im, ax=a)
     plt.tight_layout(); plt.savefig(FIGS / "xy_corrected_suppress.png", dpi=120); plt.close()
-
 
 if __name__ == "__main__":
     main()

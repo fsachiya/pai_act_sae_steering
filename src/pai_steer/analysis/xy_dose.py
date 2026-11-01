@@ -71,7 +71,12 @@ def chunk_delta(model, stats, ds, idx, spec):
 def main():
     p = base_parser(__doc__)
     p.add_argument("--ckpt", default=str(CKPT / "act.pt"))
+    p.add_argument("--plot-only", action="store_true", help="既存の xy_dose.csv / xy_single.csv から図だけ描く")
     args = p.parse_args()
+    if args.plot_only:
+        ensure(FIGS)
+        plot(pd.read_csv(RESULTS / "xy_dose.csv"), pd.read_csv(RESULTS / "xy_single.csv"))
+        return
     cfg = load_config(args.config)
     ensure(RESULTS, FIGS)
     xy = json.load(open(FEATURES / f"xy_features_{SITE}.json"))["features"]
@@ -145,10 +150,10 @@ def main():
 
 def plot(dose, sdf):
     cols = {"+x": "C0", "-x": "C1", "+y": "C2", "-y": "C3"}
-    fig, axs = plt.subplots(2, 3, figsize=(18, 10))
+    fig, axs = plt.subplots(2, 3, figsize=(15, 10.5))
     for ri, method in enumerate(["SAE", "DiffMean"]):
-        for ci, (pre, title) in enumerate([("chunk_d", "1回の推論の行動チャンク (ロールアウトなし)"),
-                                          ("rel_d", "離した位置のずれ (ロールアウト)"), ("fin_d", "キューブの最終位置のずれ")]):
+        for ci, (pre, title) in enumerate([("chunk_d", "1回の推論の行動チャンク\n(ロールアウトなし)"),
+                                          ("rel_d", "離した位置のずれ\n(ロールアウト)"), ("fin_d", "キューブの最終位置のずれ\n(ロールアウト)")]):
             a = axs[ri, ci]
             for d in DIRS:
                 g = dose[(dose.method == method) & (dose.d == d)].sort_values("alpha")
@@ -163,15 +168,17 @@ def plot(dose, sdf):
             a.axhline(0, c="k", lw=.5)
             for v in (0.14, -0.14):
                 a.axhline(v, c="gray", ls=":", lw=.8)
-            a.set_xlabel("強さ α"); a.set_ylabel("移動量 [m]"); a.set_title(f"{method}: {title}", fontsize=10)
+            a.set_xlabel("強さ α"); a.set_ylabel("移動量 [m]"); a.set_title(f"{method}: {title}")
             if ri == 0 and ci == 0:
-                a.legend(fontsize=7, ncol=2)
+                handles, labels = a.get_legend_handles_labels()
             if pre != "chunk_d":
                 a.set_ylim(-0.5, 0.5)
-    fig.suptitle("x/y 方向の特徴の刺激: 強さと移動量 (decoder_out, 4色 × seed 3 の平均 ± 標準偏差, 点線 = 隣の箱までの距離 14cm)", fontsize=11)
-    plt.tight_layout(); plt.savefig(FIGS / "xy_dose.png", dpi=120); plt.close()
+    fig.suptitle("x/y 方向（x: 前後, y: 左右）の特徴の刺激: 強さと移動量\n"
+                 "(decoder_out, 4色 × seed 3 の平均 ± 標準偏差, 点線 = 隣の箱までの距離 14cm)")
+    fig.legend(handles, labels, loc="lower center", ncol=4, bbox_to_anchor=(0.5, 0.0))
+    plt.tight_layout(rect=(0, 0.07, 1, 1)); plt.savefig(FIGS / "xy_dose.png", dpi=120); plt.close()
 
-    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+    fig, axs = plt.subplots(1, 3, figsize=(16, 6.6))
     s1 = sdf[sdf.alpha == 1.0]
     for ax, (k, t) in zip(axs[:2], [("chunk", "行動チャンクの変化 (ロールアウトなし)"), ("roll", "離した位置のずれ (ロールアウト)")]):
         for _, r in s1.iterrows():
@@ -184,8 +191,8 @@ def plot(dose, sdf):
             ax.plot([], [], c=c, lw=2, label=f"{d} の特徴: steering")
         ax.plot([], [], c="k", ls="--", label="probing (相関の向き)")
         ax.set_xlim(-1.2, 1.2); ax.set_ylim(-1.2, 1.2); ax.set_aspect("equal"); ax.axhline(0, c="k", lw=.4); ax.axvline(0, c="k", lw=.4)
-        ax.set_xlabel("x"); ax.set_ylabel("y"); ax.legend(fontsize=7, loc="lower left")
-        ax.set_title(f"単一特徴: probing (破線) と steering (実線) の向き\n{t}, α=1", fontsize=10)
+        ax.set_xlabel("x（前後）"); ax.set_ylabel("y（左右）")
+        ax.set_title(f"probing（破線）と steering（実線）の向き\n{t}, α=1")
     a = axs[2]
     x = np.arange(4)
     for j, (k, lab) in enumerate([("chunk", "行動チャンク"), ("roll", "ロールアウト")]):
@@ -193,10 +200,13 @@ def plot(dose, sdf):
         a.bar(x + (j - .5) * .38, m.values, .38, label=lab)
         for _, r in s1.iterrows():
             a.scatter(list(DIRS).index(r.d) + (j - .5) * .38, r[f"cos_probe_{k}"], c="k", s=8, zorder=5)
-    a.set_xticks(x); a.set_xticklabels([f"{d} の特徴" for d in DIRS]); a.axhline(0, c="k", lw=.5); a.set_ylim(-1.05, 1.05)
-    a.set_ylabel("cos(probing の向き, steering の向き)"); a.legend(fontsize=8)
-    a.set_title("probing と steering の一致 (各方向の上位5特徴, 点 = 各特徴)", fontsize=10)
-    plt.tight_layout(); plt.savefig(FIGS / "xy_probe_vs_steer.png", dpi=120); plt.close()
+    a.set_xticks(x); a.set_xticklabels([f"{d}\nの特徴" for d in DIRS]); a.axhline(0, c="k", lw=.5); a.set_ylim(-1.05, 1.05)
+    a.set_ylabel("cos(probing の向き, steering の向き)"); a.legend(loc="lower left")
+    a.set_title("probing と steering の一致\n(各方向の上位5特徴, 点 = 各特徴)")
+    fig.suptitle("1つの特徴を刺激したときの probing と steering の向き（各方向の上位5特徴）")
+    h, lab = axs[0].get_legend_handles_labels()
+    fig.legend(h, lab, loc="lower center", ncol=5, bbox_to_anchor=(0.5, 0.0))
+    plt.tight_layout(rect=(0, 0.07, 1, 1)); plt.savefig(FIGS / "xy_probe_vs_steer.png", dpi=120); plt.close()
 
 
 if __name__ == "__main__":

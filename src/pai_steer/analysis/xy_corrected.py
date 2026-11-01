@@ -44,7 +44,12 @@ def grid_best():
 def main():
     p = base_parser(__doc__)
     p.add_argument("--ckpt", default=str(CKPT / "act.pt"))
+    p.add_argument("--plot-only", action="store_true", help="既存の xy_corrected_summary.csv から図だけ描く")
     args = p.parse_args()
+    if args.plot_only:
+        ensure(FIGS)
+        plot(pd.read_csv(RESULTS / "xy_corrected_summary.csv"))
+        return
     cfg = load_config(args.config)
     ensure(RESULTS, FIGS)
     L = Layout(cfg["env"])
@@ -87,27 +92,38 @@ def main():
     print(sm.round(2).to_string())
     sm.to_csv(RESULTS / "xy_corrected_summary.csv", index=False)
 
-    fig, axs = plt.subplots(1, 2, figsize=(18, 5.5), gridspec_kw=dict(width_ratios=[1, 1.6]))
+    plot(sm)
+
+
+# 図の中の条件名 (レポートの表記に合わせる)
+LABEL = {"従来 SAE (上位3特徴)": "従来の SAE（上位3特徴）", "DiffMean": "DiffMean", "V1 組み合わせ・一律": "組み合わせで選ぶ",
+         "V2 軸ごとに較正": "+ 軸ごとに較正", "V3 較正 + 下ろし始めで停止": "+ 下ろし始めで停止（全方向）",
+         "V4 補正A(−y) + 補正B(対角)": "+ 対角の補正・下ろし始めで停止\n（−y を含む方向のみ）"}
+
+
+def plot(sm):
+    labels = [LABEL.get(v, v) for v in sm.条件]
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10.5), gridspec_kw=dict(height_ratios=[1, 1.15]))
     a = axs[0]
-    y = np.arange(len(VARS))
+    y = np.arange(len(sm))
     a.barh(y, sm.到達率, xerr=[sm.到達率 - sm.ci_lo, sm.ci_hi - sm.到達率], capsize=3,
-           color=["0.6", "0.6", "C0", "C1", "C2", "C3"])
+           color=["0.6", "0.6", "C0", "C1", "C2", "C3"][:len(sm)])
     for i, r in sm.iterrows():
         a.text(r.ci_hi + 0.02, i, f"{r.到達率:.0%}", va="center")
-    a.set_yticks(y); a.set_yticklabels(VARS); a.invert_yaxis(); a.set_xlim(0, 1.1)
-    a.set_xlabel("行き先の箱への到達率 (12 対 × 20 エピソード, 95% Wilson CI)")
-    a.set_title("x/y 移動の介入: 補正による精度の向上 (評価 seed 100-119)", fontsize=10)
+    a.set_yticks(y); a.set_yticklabels(labels); a.invert_yaxis(); a.set_xlim(0, 1.1)
+    a.set_xlabel("行き先の箱への到達率（12 対 × 20 エピソード, 95% Wilson CI）")
+    a.set_title("x/y 移動の介入: 補正による到達率の向上（評価 seed 100〜119）")
     a = axs[1]
     dirs = ["+x", "-x", "+y", "-y", "+x&+y", "-x&+y", "+x&-y", "-x&-y"]
     M = sm.set_index("条件").reindex(columns=dirs).values
     im = a.imshow(M, vmin=0, vmax=1, cmap="viridis", aspect="auto")
     for i in range(M.shape[0]):
         for j in range(M.shape[1]):
-            a.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=9, color="w" if M[i, j] < .6 else "k")
-    a.set_xticks(range(len(dirs))); a.set_xticklabels(dirs); a.set_yticks(range(len(VARS))); a.set_yticklabels(VARS, fontsize=8)
-    a.set_title("方向ごとの到達率", fontsize=10); plt.colorbar(im, ax=a)
+            a.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=11, color="w" if M[i, j] < .6 else "k")
+    a.set_xticks(range(len(dirs))); a.set_xticklabels(dirs); a.set_yticks(range(len(sm))); a.set_yticklabels(labels)
+    a.set_xlabel("元の箱 → 行き先の箱のずれの方向（x: 前後, y: 左右）")
+    a.set_title("方向ごとの到達率"); plt.colorbar(im, ax=a)
     plt.tight_layout(); plt.savefig(FIGS / "xy_corrected.png", dpi=120); plt.close()
-
 
 if __name__ == "__main__":
     main()

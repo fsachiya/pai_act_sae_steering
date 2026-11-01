@@ -53,23 +53,23 @@ def main():
     ds = ChunkDataset()
     m = np.isin(ds.phase, [4, 5])
     v = np.diff(ds.eef, axis=0, append=ds.eef[-1:])[m]
-    fig, axs = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw=dict(width_ratios=[1, 2.4]))
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6.2), gridspec_kw=dict(width_ratios=[1, 1.9]))
     a = axs[0]
     a.hist2d(v[:, 1] * 1000, v[:, 0] * 1000, bins=60, range=[[-15, 15], [-15, 15]], cmap="magma")
-    a.set_xlabel("1ステップの dy [mm] (+y = 左 = 箱の側)"); a.set_ylabel("1ステップの dx [mm]")
+    a.set_xlabel("1ステップの dy [mm]（左右, +y = 左 = 箱の側）"); a.set_ylabel("1ステップの dx [mm]（前後, +x = 奥）")
     a.set_title(f"学習データ: 運搬中の手先の動き\n+y {np.mean(v[:, 1] > .001):.0%}, -y {np.mean(v[:, 1] < -.001):.0%}, "
-                f"|dx| 平均 {np.abs(v[:, 0]).mean() * 1000:.1f}mm, |dy| 平均 {np.abs(v[:, 1]).mean() * 1000:.1f}mm", fontsize=9)
+                f"|dx| 平均 {np.abs(v[:, 0]).mean() * 1000:.1f}mm, |dy| 平均 {np.abs(v[:, 1]).mean() * 1000:.1f}mm")
     a = axs[1]
     M = piv.values
     a.imshow(M, vmin=0, vmax=1, cmap="viridis", aspect="auto")
     for i in range(M.shape[0]):
         for j in range(M.shape[1]):
             if np.isfinite(M[i, j]):
-                a.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=8, color="w" if M[i, j] < .6 else "k")
+                a.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=11, color="w" if M[i, j] < .6 else "k")
     a.set_xticks(range(len(DIRS))); a.set_xticklabels(DIRS)
-    a.set_yticks(range(len(piv))); a.set_yticklabels([f"{p} / {m}" for p, m in piv.index], fontsize=8)
-    a.set_xlabel("元の箱 → 行き先の箱のずれの方向")
-    a.set_title("方向ごとの最高到達率 (グリッド探索の全ての位置 × 強度の中での最高)", fontsize=10)
+    a.set_yticks(range(len(piv))); a.set_yticklabels([f"{p} / {m}" for p, m in piv.index])
+    a.set_xlabel("元の箱 → 行き先の箱のずれの方向（x: 前後, y: 左右）")
+    a.set_title("方向ごとの最高到達率\n(グリッド探索の全ての位置 × 強度の中での最高)")
     plt.tight_layout(); plt.savefig(FIGS / "direction_study.png", dpi=120); plt.close()
 
 
