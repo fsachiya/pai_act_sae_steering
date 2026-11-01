@@ -15,6 +15,7 @@ from pai_steer.viz.render import StateRenderer, font, put_text
 
 W, H = 1280, 720
 BG = (22, 26, 34)
+PAUSE = 2.0  # 動作の動画の終了後に止める秒数
 
 
 def card(lines, sub=None):
@@ -91,7 +92,7 @@ def fit(frames, title, speed):
         d.text(((W - d.textlength(title, font=ft)) / 2, 16), title, font=ft, fill=(240, 240, 240))
         a = np.array(c)
         out.append(put_text(a, f"{speed:g}x", "br", sz=24, color=(255, 230, 0)))
-    return out
+    return out + [out[-1]] * int(PAUSE * FPS)  # 結果 (どの箱に入ったか) を確認できるよう最後の画面で止める
 
 
 def main():
