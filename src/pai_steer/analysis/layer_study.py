@@ -116,6 +116,7 @@ def plot(sm):
             a.bar(x - .4 + w * (j + .5), sm[c].fillna(0), w, label=f"{'SAE' if method == 'sae' else 'DiffMean'} {sym}={st}")
         a.set_title(title); a.set_ylim(0, 1.05); a.legend(fontsize=8)
     axs[0].set_title("SAE の品質"); axs[0].legend(fontsize=8, loc="upper center", ncol=2); axs[0].set_ylim(0, 1.2)
+    axs[0].set_yticks(np.arange(0, 1.01, 0.2))   # 上限は 1.0. 1.2 までの余白は凡例用
     axs[1].set_title("目標特徴の相対選択性 (最良トークン)"); axs[1].set_ylim(0, 1.1)
     for a in axs:
         a.set_xticks(x); a.set_xticklabels(sites, rotation=30, ha="right", fontsize=9)

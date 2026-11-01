@@ -41,6 +41,7 @@ h3 {{ font-size: 12pt; margin-top: 1.1em; }}
 table {{ border-collapse: collapse; margin: 0.6em 0; font-size: 9.5pt; }}
 th, td {{ border: 1px solid #999; padding: 3px 7px; }} th {{ background: #eef2f7; }}
 img {{ max-width: 100%; max-height: 135mm; display: block; margin: 0.5em auto; page-break-inside: avoid; }}
+img[alt="刺激した特徴"] {{ max-height: 230mm; }}   /* 縦長の図は幅いっぱいに表示する */
 .math {{ margin: 0.6em 0; overflow-x: auto; }}
 .katex {{ font-size: 1.05em; }}
 code {{ font-size: 9pt; background: #f3f3f3; padding: 0 3px; }}
