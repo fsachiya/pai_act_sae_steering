@@ -38,7 +38,7 @@ Claude Code はこのファイルを唯一の正として実装すること。�
 | パッケージ管理 | `uv`（プロジェクト内 `.venv`） |
 | シミュレータ | **robosuite 1.5.x**（DeepMind の `mujoco` Python バインディング版）＋ Panda |
 | Python | 3.12 を第一候補とする。robosuite 1.5 が入らなければ 3.11 → 3.10 の順に下げる |
-| 配置 | `~/work/pai_act_sae_steering/` |
+| 配置 | リポジトリのルート |
 | 長時間ジョブ | `nohup` と `caffeinate -i` で実行し、ログは `artifacts/logs/` に出す。MacBook Air はファンレスなので熱による速度低下を前提にする |
 
 ### 1.1 依存関係
@@ -46,7 +46,7 @@ Claude Code はこのファイルを唯一の正として実装すること。�
 
 - LeRobot、robomimic、MimicGen は使わない。
 - ACT は自前で最小実装する。フックを掛けるモジュール名を自分で管理するため。
-- SAE は `~/work/sae_so101/src/sae_so101/sae/` の TopK 実装を**コピーして移植**する。パス依存にはしない。
+- SAE は既存の別プロジェクトの TopK 実装を**コピーして移植**する。パス依存にはしない。
 
 ### 1.2 レンダリング
 - offscreen 描画（`has_offscreen_renderer=True`）が macOS で動くかを Phase 0 で確認する。`MUJOCO_GL` は未設定、`cgl`、`glfw` の順に試す。
@@ -277,7 +277,7 @@ data/
 - ラベル（cube_color、phase、行動、手先の将来の変位 dx, dy）を対応づけて保存する。
 
 ### 7.2 SAE の構成（`topk_sae.py`）
-sae_so101 の TopK 実装を移植する（入力の正規化、デコーダの単位ノルム化、任意で OrtSAE の直交化損失）。
+既存の別プロジェクトの TopK 実装を移植する（入力の正規化、デコーダの単位ノルム化、任意で OrtSAE の直交化損失）。
 
 $$
 f = \mathrm{TopK}\left(W_{\mathrm{enc}}(\tilde{h} - b_{\mathrm{dec}}) + b_{\mathrm{enc}}\right), \qquad \hat{\tilde{h}} = W_{\mathrm{dec}} f + b_{\mathrm{dec}}

@@ -1,4 +1,4 @@
-"""TopK SAE (sae_so101 / sae_transformer の TopKSAE を移植).
+"""TopK SAE (既存の別プロジェクトの TopKSAE を移植).
 
 f = TopK(W_enc (norm(h) - b_pre) + b_enc),  norm(h)^ = W_dec f + b_dec
 入力の正規化統計をバッファに持ち, デコーダ列は単位ノルムに保つ. 任意で OrtSAE の直交化損失.
