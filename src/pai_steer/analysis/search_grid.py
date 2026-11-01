@@ -5,6 +5,7 @@
   2. SAE は主な位置で, 使う特徴の数 n × 強度 も評価
 各マス = 4色 × 他の3色の箱 × seed 0..n_seed-1 (gate=lift, 介入は把持後).
 出力 artifacts/results/search_grid.csv, search_coverage.csv, 図 artifacts/figs/search_grid.png
+--plot-only で既存の search_grid.csv から集計と図だけ作り直す.
 """
 import numpy as np
 import pandas as pd
@@ -39,7 +40,11 @@ def main():
     p = base_parser(__doc__)
     p.add_argument("--ckpt", default=str(CKPT / "act.pt"))
     p.add_argument("--n-seed", type=int, default=5)
+    p.add_argument("--plot-only", action="store_true", help="ロールアウトせず既存の search_grid.csv から集計と図だけ作る")
     args = p.parse_args()
+    if args.plot_only:
+        summarize(pd.read_csv(RESULTS / "search_grid.csv"), args.n_seed)
+        return
     cfg = load_config(args.config)
     ensure(RESULTS, FIGS)
     L = Layout(cfg["env"])
@@ -97,34 +102,52 @@ def summarize(df, n_seed):
     print(cov.to_string())
     print(f"合計 {len(df)} エピソード (各マス = 4色 × 他の3色 × seed {n_seed})")
 
-    groups = list(df[df.study == "grid"].groupby(["pattern", "method"], sort=False).groups.keys())
-    fig, axs = plt.subplots(2, 5, figsize=(26, 9.5))
-    for ax, (pt, m) in zip(axs.flat, groups):
-        a = agg[(agg.study == "grid") & (agg.pattern == pt) & (agg.method == m)]
-        sites = list(dict.fromkeys(a.site)); sts = sorted(a.strength.unique())
-        M = np.full((len(sites), len(sts)), np.nan)
-        for _, r in a.iterrows():
-            M[sites.index(r.site), sts.index(r.strength)] = r.reached
-        ax.imshow(M, vmin=0, vmax=1, cmap="viridis", aspect="auto")
-        for i in range(len(sites)):
-            for j in range(len(sts)):
-                ax.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=8, color="w" if M[i, j] < .6 else "k")
-        ax.set_xticks(range(len(sts))); ax.set_xticklabels([f"{x:g}" for x in sts]); ax.set_xlabel("強度")
-        ax.set_yticks(range(len(sites))); ax.set_yticklabels(sites, fontsize=8)
-        ax.set_title(f"{pt} / {m}", fontsize=10)
-    for ax, (pt, m, site, sts) in zip(list(axs.flat)[len(groups):], NGRID):
-        b = agg[(agg.study == "n_feat") & (agg.pattern == pt) & (agg.method == m)]
-        for s in sts:
-            bb = b[b.strength == s].sort_values("n_feat")
-            ax.plot(bb.n_feat, bb.reached, marker="o", label=f"強度 {s:g}")
-        ax.set_xscale("log"); ax.set_xticks(N_FEATS); ax.set_xticklabels(N_FEATS); ax.set_ylim(-0.03, 1.03)
-        ax.set_xlabel("使う特徴の数 n"); ax.set_ylabel("到達率"); ax.legend(fontsize=8)
-        ax.set_title(f"特徴数の探索: {pt} / {m} ({site})", fontsize=10)
-    for ax in list(axs.flat)[len(groups) + len(NGRID):]:
-        ax.axis("off")
-    fig.suptitle(f"介入探索のグリッド (到達率, 各マス 60 エピソード = 4色 × 他の3色 × seed {n_seed}, 介入は把持後)", fontsize=12)
-    plt.tight_layout(); plt.savefig(FIGS / "search_grid.png", dpi=110); plt.close()
+    plot(agg, n_seed)
 
+
+def plot(agg, n_seed):
+    """パターンごとに1行: 位置 × 強度のヒートマップ (手法ごと) と, SAE の特徴数の探索."""
+    rows = []
+    for pt in dict.fromkeys(m[0] for m in GRID):
+        panels = [("grid", pt, m) for p_, m, *_ in GRID if p_ == pt]
+        panels += [("n_feat", pt, m, site, sts) for p_, m, site, sts in NGRID if p_ == pt]
+        rows.append(panels)
+    ncol = max(len(r) for r in rows)
+    fig, axs = plt.subplots(len(rows), ncol, figsize=(4.3 * ncol, 3.9 * len(rows)))
+    for r, panels in enumerate(rows):
+        for c in range(ncol):
+            ax = axs[r, c]
+            if c >= len(panels):
+                ax.axis("off")
+                continue
+            if panels[c][0] == "grid":
+                _, pt, m = panels[c]
+                a = agg[(agg.study == "grid") & (agg.pattern == pt) & (agg.method == m)]
+                sites = list(dict.fromkeys(a.site)); sts = sorted(a.strength.unique())
+                M = np.full((len(sites), len(sts)), np.nan)
+                for _, row in a.iterrows():
+                    M[sites.index(row.site), sts.index(row.strength)] = row.reached
+                ax.imshow(M, vmin=0, vmax=1, cmap="viridis", aspect="auto")
+                for i in range(len(sites)):
+                    for j in range(len(sts)):
+                        ax.text(j, i, f"{M[i, j]:.0%}", ha="center", va="center", fontsize=10,
+                                color="w" if M[i, j] < .6 else "k")
+                ax.set_xticks(range(len(sts))); ax.set_xticklabels([f"{x:g}" for x in sts], fontsize=9)
+                ax.set_xlabel("強度", fontsize=9)
+                ax.set_yticks(range(len(sites))); ax.set_yticklabels(sites, fontsize=9)
+                ax.set_title(f"{pt} / {m}", fontsize=11)
+            else:
+                _, pt, m, site, sts = panels[c]
+                b = agg[(agg.study == "n_feat") & (agg.pattern == pt) & (agg.method == m)]
+                for st in sts:
+                    bb = b[b.strength == st].sort_values("n_feat")
+                    ax.plot(bb.n_feat, bb.reached, marker="o", label=f"強度 {st:g}")
+                ax.set_xscale("log"); ax.set_xticks(N_FEATS); ax.set_xticklabels(N_FEATS); ax.set_ylim(-0.03, 1.03)
+                ax.set_xlabel("使う特徴の数 n", fontsize=9); ax.set_ylabel("到達率", fontsize=9); ax.legend(fontsize=9)
+                ax.set_title(f"特徴数の探索: {pt} / {m}\n({site})", fontsize=10.5)
+    fig.suptitle(f"介入探索のグリッド (到達率, 各マス 60 エピソード = 4色 × 他の3色 × seed {n_seed}, 介入は把持後)",
+                 fontsize=13)
+    plt.tight_layout(); plt.savefig(FIGS / "search_grid.png", dpi=130); plt.close()
 
 if __name__ == "__main__":
     main()
