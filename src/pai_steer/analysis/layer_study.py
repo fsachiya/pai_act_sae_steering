@@ -8,6 +8,7 @@
   5. P1 介入 (decoder の位置のみ, SAE add α と DiffMean α): 到達率と行き先方向のずれ
 全色 × 他の3色の箱 × seed 0..n-1. 介入は gate=lift (把持後).
 出力 artifacts/results/layer_study.csv, layer_study_summary.csv, 図 artifacts/figs/layer_study.png
+--plot-only で既存の layer_study_summary.csv から図だけ描き直す.
 """
 import json
 
@@ -34,7 +35,12 @@ def main():
     p.add_argument("--p2-dm-alphas", default="1,2")
     p.add_argument("--p1-alphas", default="4")
     p.add_argument("--p1-dm-alphas", default="4")
+    p.add_argument("--plot-only", action="store_true", help="ロールアウトせず既存の集計から図だけ描く")
     args = p.parse_args()
+    if args.plot_only:
+        ensure(FIGS)
+        plot(pd.read_csv(RESULTS / "layer_study_summary.csv"))
+        return
     cfg = load_config(args.config)
     ensure(RESULTS, FIGS)
     L = Layout(cfg["env"])
@@ -86,7 +92,13 @@ def main():
     pd.set_option("display.width", 250)
     print(sm.round(3).to_string())
 
-    fig, axs = plt.subplots(1, 4, figsize=(20, 4.2))
+    plot(sm)
+
+def plot(sm):
+    """位置ごとの集計 sm (layer_study_summary.csv) から 2×2 の図を描く."""
+    fig, axs = plt.subplots(2, 2, figsize=(13, 8.5))
+    axs = axs.ravel()
+    sites = list(sm.site)
     x = np.arange(len(sites))
     axs[0].bar(x - .2, sm.r2, .4, label="SAE の R²")
     axs[0].bar(x + .2, sm.recon_success, .4, label="SAE 置換時の成功率")
@@ -94,17 +106,20 @@ def main():
     axs[1].bar(x, sm.goal_rel_sel, color="C4")
     for i, t in enumerate(sm.goal_token):
         axs[1].text(i, sm.goal_rel_sel[i] + .02, t, ha="center", fontsize=8)
-    for a, prefix, title in [(axs[2], "p2", "P2: 行き先の箱への到達率"), (axs[3], "p1", "P1: 行き先の箱への到達率")]:
+    for a, prefix, title in [(axs[2], "p2", "色の介入 (P2): 行き先の箱への到達率"),
+                             (axs[3], "p1", "x/y 移動の介入 (P1): 行き先の箱への到達率")]:
         cols = [c for c in sm.columns if c.startswith(prefix) and c.endswith("_reached")]
         w = 0.8 / max(1, len(cols))
         for j, c in enumerate(cols):
-            a.bar(x - .4 + w * (j + .5), sm[c].fillna(0), w, label=c.replace("_reached", "").replace("_sae", " SAE").replace("_dm", " DiffMean"))
-        a.set_title(title); a.set_ylim(0, 1.05); a.legend(fontsize=7)
-    axs[0].set_title("SAE の品質"); axs[0].legend(fontsize=8); axs[0].set_ylim(0, 1.05)
+            method, st = c.replace("_reached", "").split("_", 1)[1].split("@")
+            sym = "β" if (prefix, method) == ("p2", "sae") else "α"
+            a.bar(x - .4 + w * (j + .5), sm[c].fillna(0), w, label=f"{'SAE' if method == 'sae' else 'DiffMean'} {sym}={st}")
+        a.set_title(title); a.set_ylim(0, 1.05); a.legend(fontsize=8)
+    axs[0].set_title("SAE の品質"); axs[0].legend(fontsize=8, loc="upper center", ncol=2); axs[0].set_ylim(0, 1.2)
     axs[1].set_title("目標特徴の相対選択性 (最良トークン)"); axs[1].set_ylim(0, 1.1)
     for a in axs:
-        a.set_xticks(x); a.set_xticklabels(sites, rotation=35, ha="right", fontsize=8)
-    plt.suptitle("SAE を適用する位置の比較 (介入は把持後, 全色 × 他の3色の箱)", fontsize=11)
+        a.set_xticks(x); a.set_xticklabels(sites, rotation=30, ha="right", fontsize=9)
+    plt.suptitle("SAE を適用する位置の比較 (介入は把持後, 全色 × 他の3色の箱)", fontsize=12)
     plt.tight_layout(); plt.savefig(FIGS / "layer_study.png", dpi=130); plt.close()
 
 
